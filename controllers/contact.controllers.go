@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
-	"database/sql"
+	"errors"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,7 +27,6 @@ func NewContactController(db *db.Queries, ctx context.Context) *ContactControlle
 // CreateContact godoc
 //
 //	@Summary		Create new contact
-//	@Description	add by json contact
 //	@Tags			contacts
 //	@Accept			json
 //	@Produce		json
@@ -46,8 +47,8 @@ func (cc *ContactController) CreateContact(ctx *gin.Context) {
 		LastName:    payload.LastName,
 		PhoneNumber: payload.PhoneNumber,
 		Street:      payload.Street,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreatedAt:   pgtype.Timestamp{Time: now, Valid: true},
+		UpdatedAt:   pgtype.Timestamp{Time: now, Valid: true},
 	}
 
 	contact, err := cc.db.CreateContact(ctx, *args)
@@ -60,7 +61,16 @@ func (cc *ContactController) CreateContact(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "successfully created contact", "contact": contact})
 }
 
-// Update contact handler
+// UpdateContact godoc
+//
+//	@Summary		Update contact
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Param          contactId   path      	int  					true  	"Contact Id"
+//	@Param			contact		body		schemas.UpdateContact	true	"Update contact"
+//	@Success		200		{object}	db.Contact
+//	@Router			/contacts/{contactId} [patch]
 func (cc *ContactController) UpdateContact(ctx *gin.Context) {
 	var payload *schemas.UpdateContact
 	contactId := ctx.Param("contactId")
@@ -80,17 +90,17 @@ func (cc *ContactController) UpdateContact(ctx *gin.Context) {
 	now := time.Now()
 	args := &db.UpdateContactParams{
 		ContactID:   int32(id),
-		FirstName:   sql.NullString{String: payload.FirstName, Valid: payload.FirstName != ""},
-		LastName:    sql.NullString{String: payload.LastName, Valid: payload.LastName != ""},
-		PhoneNumber: sql.NullString{String: payload.PhoneNumber, Valid: payload.PhoneNumber != ""},
-		Street:      sql.NullString{String: payload.PhoneNumber, Valid: payload.Street != ""},
-		UpdatedAt:   sql.NullTime{Time: now, Valid: true},
+		FirstName:   pgtype.Text{String: payload.FirstName, Valid: payload.FirstName != ""},
+		LastName:    pgtype.Text{String: payload.LastName, Valid: payload.LastName != ""},
+		PhoneNumber: pgtype.Text{String: payload.PhoneNumber, Valid: payload.PhoneNumber != ""},
+		Street:      pgtype.Text{String: payload.PhoneNumber, Valid: payload.Street != ""},
+		UpdatedAt:   pgtype.Timestamp{Time: now, Valid: true},
 	}
 
 	contact, err := cc.db.UpdateContact(ctx, *args)
 
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, gin.H{"status": "failed", "message": "Failed to retrieve contact with this ID"})
 			return
 		}
@@ -101,7 +111,15 @@ func (cc *ContactController) UpdateContact(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "successfully updated contact", "contact": contact})
 }
 
-// Get a single handler
+// GetContactById godoc
+//
+//		@Summary		Get contact by id
+//		@Tags			contacts
+//		@Accept			json
+//		@Produce		json
+//	 	@Param          contactId   path      int  true  "Contact Id"
+//		@Success		200		{object}	db.Contact
+//		@Router			/contacts/{contactId} [get]
 func (cc *ContactController) GetContactById(ctx *gin.Context) {
 	contactId := ctx.Param("contactId")
 
@@ -114,7 +132,7 @@ func (cc *ContactController) GetContactById(ctx *gin.Context) {
 
 	contact, err := cc.db.GetContactById(ctx, int32(id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, gin.H{"status": "failed", "message": "Failed to retrieve contact with this ID"})
 			return
 		}
@@ -125,7 +143,14 @@ func (cc *ContactController) GetContactById(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "Successfully retrived id", "contact": contact})
 }
 
-// Retrieve all records handlers
+// GetAllContacts godoc
+//
+//	@Summary		Get all contacts
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Success		200		{object}	[]db.Contact
+//	@Router			/contacts [get]
 func (cc *ContactController) GetAllContacts(ctx *gin.Context) {
 	var page = ctx.DefaultQuery("page", "1")
 	var limit = ctx.DefaultQuery("limit", "10")
@@ -152,7 +177,15 @@ func (cc *ContactController) GetAllContacts(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"status": "Successfully retrieved all contacts", "size": len(contacts), "contacts": contacts})
 }
 
-// Deleting contact handlers
+// DeleteContactById godoc
+//
+//	@Summary		Delete contact by id
+//	@Tags			contacts
+//	@Accept			json
+//	@Produce		json
+//	@Param          contactId   path      	int  					true  	"Contact Id"
+//	@Success		204
+//	@Router			/contacts/{contactId} [delete]
 func (cc *ContactController) DeleteContactById(ctx *gin.Context) {
 	contactId := ctx.Param("contactId")
 
@@ -165,7 +198,7 @@ func (cc *ContactController) DeleteContactById(ctx *gin.Context) {
 
 	_, err = cc.db.GetContactById(ctx, int32(id))
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			ctx.JSON(http.StatusNotFound, gin.H{"status": "failed", "message": "Failed to retrieve contact with this ID"})
 			return
 		}

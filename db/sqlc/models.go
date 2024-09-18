@@ -5,15 +5,15 @@
 package db
 
 import (
-	"time"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Contact struct {
-	ContactID   int32     `json:"contact_id"`
-	FirstName   string    `json:"first_name"`
-	LastName    string    `json:"last_name"`
-	PhoneNumber string    `json:"phone_number"`
-	Street      string    `json:"street"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ContactID   int32            `json:"contact_id"`
+	FirstName   string           `json:"first_name"`
+	LastName    string           `json:"last_name"`
+	PhoneNumber string           `json:"phone_number"`
+	Street      string           `json:"street"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
 }

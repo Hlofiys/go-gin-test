@@ -7,8 +7,8 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createContact = `-- name: CreateContact :one
@@ -25,16 +25,16 @@ INSERT INTO contacts(
 `
 
 type CreateContactParams struct {
-	FirstName   string    `json:"first_name"`
-	LastName    string    `json:"last_name"`
-	PhoneNumber string    `json:"phone_number"`
-	Street      string    `json:"street"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	FirstName   string           `json:"first_name"`
+	LastName    string           `json:"last_name"`
+	PhoneNumber string           `json:"phone_number"`
+	Street      string           `json:"street"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
 }
 
 func (q *Queries) CreateContact(ctx context.Context, arg CreateContactParams) (Contact, error) {
-	row := q.queryRow(ctx, q.createContactStmt, createContact,
+	row := q.db.QueryRow(ctx, createContact,
 		arg.FirstName,
 		arg.LastName,
 		arg.PhoneNumber,
@@ -61,7 +61,7 @@ WHERE contact_id = $1
 `
 
 func (q *Queries) DeleteContact(ctx context.Context, contactID int32) error {
-	_, err := q.exec(ctx, q.deleteContactStmt, deleteContact, contactID)
+	_, err := q.db.Exec(ctx, deleteContact, contactID)
 	return err
 }
 
@@ -71,7 +71,7 @@ WHERE contact_id = $1 LIMIT 1
 `
 
 func (q *Queries) GetContactById(ctx context.Context, contactID int32) (Contact, error) {
-	row := q.queryRow(ctx, q.getContactByIdStmt, getContactById, contactID)
+	row := q.db.QueryRow(ctx, getContactById, contactID)
 	var i Contact
 	err := row.Scan(
 		&i.ContactID,
@@ -98,7 +98,7 @@ type ListContactsParams struct {
 }
 
 func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]Contact, error) {
-	rows, err := q.query(ctx, q.listContactsStmt, listContacts, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listContacts, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -119,9 +119,6 @@ func (q *Queries) ListContacts(ctx context.Context, arg ListContactsParams) ([]C
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -141,16 +138,16 @@ RETURNING contact_id, first_name, last_name, phone_number, street, created_at, u
 `
 
 type UpdateContactParams struct {
-	FirstName   sql.NullString `json:"first_name"`
-	LastName    sql.NullString `json:"last_name"`
-	PhoneNumber sql.NullString `json:"phone_number"`
-	Street      sql.NullString `json:"street"`
-	UpdatedAt   sql.NullTime   `json:"updated_at"`
-	ContactID   int32          `json:"contact_id"`
+	FirstName   pgtype.Text      `json:"first_name"`
+	LastName    pgtype.Text      `json:"last_name"`
+	PhoneNumber pgtype.Text      `json:"phone_number"`
+	Street      pgtype.Text      `json:"street"`
+	UpdatedAt   pgtype.Timestamp `json:"updated_at"`
+	ContactID   int32            `json:"contact_id"`
 }
 
 func (q *Queries) UpdateContact(ctx context.Context, arg UpdateContactParams) (Contact, error) {
-	row := q.queryRow(ctx, q.updateContactStmt, updateContact,
+	row := q.db.QueryRow(ctx, updateContact,
 		arg.FirstName,
 		arg.LastName,
 		arg.PhoneNumber,
